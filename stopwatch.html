@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스탑워치</title>
+<style>
+  :root {
+    --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
+    --border: #e5e5ea; --start: #34c759; --stop: #ff3b30; --neutral: #8e8e93;
+    --best: #34c759; --worst: #ff3b30;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --card: #1c1c1e; --text: #f5f5f7; --muted: #98989d;
+      --border: #2c2c2e; --neutral: #48484a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    display: flex; justify-content: center; padding: 40px 16px;
+  }
+  .wrap { width: 100%; max-width: 420px; }
+  .display {
+    font-variant-numeric: tabular-nums; font-size: clamp(48px, 16vw, 76px);
+    font-weight: 300; text-align: center; letter-spacing: -1px; margin: 24px 0 36px;
+  }
+  .display .ms { color: var(--muted); }
+  .controls { display: flex; justify-content: space-between; margin-bottom: 28px; }
+  button {
+    width: 88px; height: 88px; border-radius: 50%; border: none; cursor: pointer;
+    font-size: 17px; font-weight: 500; color: #fff; transition: transform .08s, opacity .2s;
+  }
+  button:active { transform: scale(.95); }
+  button:disabled { opacity: .4; cursor: default; }
+  #secondary { background: var(--neutral); }
+  #primary.start { background: var(--start); }
+  #primary.stop { background: var(--stop); }
+  ul { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--border); }
+  li {
+    display: flex; justify-content: space-between; padding: 12px 4px;
+    border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; font-size: 17px;
+  }
+  li.best { color: var(--best); }
+  li.worst { color: var(--worst); }
+  .glass-box { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  #hourglass { width: 130px; height: 216px; transform-origin: 50% 50%; }
+  #hourglass.flipping { transition: transform .5s ease-in-out; transform: rotate(180deg); }
+  .frame { fill: #8b5a2b; }
+  .glass { fill: rgba(160, 200, 230, .12); stroke: var(--muted); stroke-width: 2; }
+  .sand { fill: #e0a84a; }
+  #stream { stroke: #e0a84a; stroke-width: 2.5; stroke-dasharray: 4 3; animation: fall .25s linear infinite; }
+  @keyframes fall { to { stroke-dashoffset: -7; } }
+  .cycle { font-size: 14px; color: var(--muted); }
+  .cycle select {
+    font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+  }
+  /* ---- 배경: 시험 보는 학생 ---- */
+  .wrap { position: relative; z-index: 1; }
+  #student {
+    position: fixed; left: 2vw; bottom: 0; width: min(340px, 45vw);
+    z-index: 0; pointer-events: none; opacity: .18;
+  }
+  /* 양옆에 공간이 충분할 때만 선명하게, 좁으면 흐린 배경으로 */
+  @media (min-width: 1150px) { #student { opacity: .95; } }
+  @media (max-width: 700px) { #student { width: 70vw; } }
+  .skin { fill: #f2c9a0; }
+  .hair { fill: #3b2a20; }
+  .uniform { stroke: #3d5a98; }
+  .pants { stroke: #2b2f3a; }
+  .wood { fill: #b07a45; }
+  .wood-line { stroke: #b07a45; stroke-width: 5; }
+  .paper { fill: #ffffff; stroke: #c7c7cc; stroke-width: 1; }
+  #arm { transform-box: fill-box; transform-origin: 0% 0%; }
+  body.running #arm { animation: write .35s ease-in-out infinite alternate; }
+  @keyframes write { to { transform: translate(5px, 1px) rotate(-4deg); } }
+  #sweat { opacity: 0; }
+  body.running #sweat { animation: sweat 2.4s ease-in infinite; }
+  @keyframes sweat {
+    0% { opacity: 0; transform: translateY(0); }
+    20% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(14px); }
+  }
+  .hint { text-align: center; color: var(--muted); font-size: 13px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<svg id="student" viewBox="0 0 240 200" aria-hidden="true">
+  <defs>
+    <linearGradient id="gSkin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6d2ae"/><stop offset="1" stop-color="#dda67a"/>
+    </linearGradient>
+    <linearGradient id="gHair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4a3528"/><stop offset="1" stop-color="#1e1510"/>
+    </linearGradient>
+    <linearGradient id="gBlazer" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3f5f9e"/><stop offset="1" stop-color="#22355e"/>
+    </linearGradient>
+    <linearGradient id="gPants" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3f4b"/><stop offset="1" stop-color="#1f222a"/>
+    </linearGradient>
+    <linearGradient id="gWood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c8955e"/><stop offset="1" stop-color="#8f5f31"/>
+    </linearGradient>
+    <radialGradient id="gShadow"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  </defs>
+
+  <!-- 바닥 그림자 -->
+  <ellipse cx="135" cy="196" rx="110" ry="5" fill="url(#gShadow)"/>
+
+  <!-- 의자 -->
+  <rect x="33" y="80" width="13" height="36" rx="4" fill="url(#gWood)"/>
+  <rect x="38" y="80" width="5" height="64" rx="2" fill="#8f5f31"/>
+  <rect x="36" y="136" width="58" height="7" rx="3" fill="url(#gWood)"/>
+  <rect x="39" y="143" width="4" height="53" fill="#7a4f28"/>
+  <rect x="87" y="143" width="4" height="53" fill="#7a4f28"/>
+  <rect x="41" y="170" width="48" height="3" fill="#7a4f28"/>
+
+  <!-- 먼 쪽 다리 (어둡게) -->
+  <path d="M70 128 L112 130 C118 130 121 134 120 140 L118 184 L108 184 L109 141 L72 142 Z" fill="#23262e"/>
+
+  <!-- 먼 쪽 팔: 책상 위 시험지를 누르고 있음 -->
+  <path d="M100 96 C108 104 112 112 116 116 L170 114 L171 120 L114 123 C106 120 98 110 94 102 Z" fill="#1d2d50"/>
+  <path d="M168 113 C174 112 179 114 180 117 C178 120 173 121 169 120 Z" fill="#d49a6c"/>
+
+  <!-- 책상 -->
+  <rect x="110" y="117" width="126" height="6" rx="2" fill="url(#gWood)"/>
+  <rect x="114" y="123" width="118" height="10" fill="#9b6a3a"/>
+  <rect x="118" y="133" width="5" height="63" fill="#7a4f28"/>
+  <rect x="223" y="133" width="5" height="63" fill="#7a4f28"/>
+
+  <!-- 시험지 + 필통 -->
+  <polygon points="132,117 192,117 200,110 140,110" fill="#fff" stroke="#c7c7cc" stroke-width=".6"/>
+  <line x1="146" y1="112.2" x2="188" y2="112.2" stroke="#9aa0a6" stroke-width=".6"/>
+  <line x1="143" y1="114.6" x2="185" y2="114.6" stroke="#9aa0a6" stroke-width=".6"/>
+  <path d="M176 111 l3 2 l5 -5" stroke="#ff3b30" stroke-width="1" fill="none"/>
+  <rect x="206" y="109" width="24" height="8" rx="4" fill="#d9534f"/>
+  <rect x="206" y="109" width="24" height="3" rx="1.5" fill="#e9726e"/>
+
+  <!-- 가까운 쪽 다리 -->
+  <path d="M62 124 C62 136 66 140 74 140 L114 138 C112 152 112 170 112 184 L124 184 C124 166 126 146 126 136 C126 128 120 124 112 124 Z" fill="url(#gPants)"/>
+  <path d="M110 128 C116 128 120 131 120 136" stroke="#4b5161" stroke-width="1" fill="none"/>
+  <!-- 신발 -->
+  <path d="M108 183 L125 183 C133 183 139 187 139 191 L139 193 L108 193 Z" fill="#141414"/>
+  <rect x="108" y="192" width="31" height="2.5" rx="1" fill="#f2f2f2"/>
+
+  <!-- 몸통 (교복 재킷) -->
+  <path d="M58 132 C54 116 66 98 84 88 C96 82 108 84 112 92 C116 102 106 118 98 132 Z" fill="url(#gBlazer)"/>
+  <path d="M100 86 L108 92 L101 98 Z" fill="#f4f4f4"/>
+  <path d="M104 92 L107 104 L102 102 Z" fill="#a32626"/>
+
+  <!-- 목 -->
+  <path d="M100 84 C102 78 108 76 112 79 L111 89 C107 90 103 89 100 84 Z" fill="#dca47a"/>
+
+  <!-- 머리 (아래를 내려다보는 옆얼굴) -->
+  <path d="M104 60 C106 49 120 46 128 52 C134 57 135 64 134 69 L137 75 L134 76.5 C134 81 132 85 127 87 C120 89 112 88 108 84 C103 79 102 70 104 60 Z" fill="url(#gSkin)"/>
+  <ellipse cx="114" cy="70" rx="3" ry="4.2" fill="#d79c70"/>
+  <path d="M113 68 C115 69 115 72 113 73" stroke="#b97f56" stroke-width=".8" fill="none"/>
+  <!-- 눈썹, 감긴 듯 내려다보는 눈, 입 -->
+  <path d="M124 64 C127 63 130 63.5 132 65" stroke="#3a2a20" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M126 70 C128 71.5 130 71.5 131.5 70.5" stroke="#2a1d15" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <path d="M128 82 C130 82.5 131.5 82 132.5 81" stroke="#a0584a" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <ellipse cx="125" cy="77" rx="3" ry="1.8" fill="#f0a08a" opacity=".35"/>
+  <!-- 머리카락 -->
+  <path d="M101 70 C96 52 108 42 122 44 C132 45 138 52 137 60 C133 56 127 55 122 57 C124 60 124 62 121 63 C118 60 114 60 112 63 C110 66 109 69 108 73 C106 76 104 80 103 84 C100 80 100 75 101 70 Z" fill="url(#gHair)"/>
+  <path d="M110 50 C116 47 124 47 130 50" stroke="#6b4e3a" stroke-width="1" fill="none" opacity=".7"/>
+
+  <!-- 땀방울 -->
+  <path id="sweat" d="M108 58 C106 62 106 65 108 65 C110 65 110 62 108 58 Z" fill="#5ac8fa"/>
+
+  <!-- 가까운 쪽 팔 + 연필 (글씨 쓰는 손) -->
+  <g id="arm">
+    <path d="M96 94 C104 92 112 98 118 108 L126 116 L146 110 L148 117 L124 124 C118 124 112 118 104 110 C98 104 94 98 96 94 Z" fill="url(#gBlazer)"/>
+    <path d="M144 109.5 L148 108.5 L150 116 L146 117.2 Z" fill="#f4f4f4"/>
+    <path d="M148 109 C153 107 158 108 159 111 C160 114 157 117 152 117 L149 116 Z" fill="url(#gSkin)"/>
+    <path d="M153 111.5 C155 111 157 111.5 158 112.5" stroke="#c48a60" stroke-width=".7" fill="none"/>
+    <line x1="152" y1="115" x2="161" y2="101" stroke="#f5c400" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="160" y1="102.5" x2="161.5" y2="100" stroke="#f29bb0" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="152" y1="115" x2="150.8" y2="117" stroke="#3a3a3a" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+</svg>
+<div class="wrap">
+  <div class="glass-box">
+    <svg id="hourglass" viewBox="0 0 120 200" aria-label="모래시계">
+      <defs>
+        <clipPath id="glassClip">
+          <path d="M22 14 L98 14 C98 60 64 85 63 100 C64 115 98 140 98 186 L22 186 C22 140 56 115 57 100 C56 85 22 60 22 14 Z"/>
+        </clipPath>
+      </defs>
+      <path class="glass" d="M22 14 L98 14 C98 60 64 85 63 100 C64 115 98 140 98 186 L22 186 C22 140 56 115 57 100 C56 85 22 60 22 14 Z"/>
+      <g clip-path="url(#glassClip)">
+        <rect id="sandTop" class="sand" x="0" width="120" y="30" height="70"/>
+        <rect id="sandBottom" class="sand" x="0" width="120" y="186" height="0"/>
+        <line id="stream" x1="60" x2="60" y1="98" y2="186" visibility="hidden"/>
+      </g>
+      <rect class="frame" x="10" y="4" width="100" height="10" rx="3"/>
+      <rect class="frame" x="10" y="186" width="100" height="10" rx="3"/>
+    </svg>
+    <label class="cycle">모래 한 번 떨어지는 시간
+      <select id="cycle">
+        <option value="10000">10초</option>
+        <option value="30000">30초</option>
+        <option value="60000" selected>1분</option>
+        <option value="300000">5분</option>
+      </select>
+    </label>
+  </div>
+  <div class="display" id="display">00:00<span class="ms">.00</span></div>
+  <div class="controls">
+    <button id="secondary" disabled>랩</button>
+    <button id="primary" class="start">시작</button>
+  </div>
+  <ul id="laps"></ul>
+  <p class="hint">Space: 시작/정지 · L: 랩 · R: 초기화</p>
+</div>
+
+<script>
+  const display = document.getElementById('display');
+  const primary = document.getElementById('primary');
+  const secondary = document.getElementById('secondary');
+  const lapList = document.getElementById('laps');
+
+  let running = false;
+  let startTime = 0;     // performance.now() at last start
+  let elapsed = 0;       // accumulated ms before last start
+  let laps = [];         // lap durations (ms)
+  let lapStart = 0;      // total time when current lap began
+  let rafId = null;
+
+  const total = () => running ? elapsed + (performance.now() - startTime) : elapsed;
+
+  function fmt(ms) {
+    const cs = Math.floor(ms / 10) % 100;
+    const s = Math.floor(ms / 1000) % 60;
+    const m = Math.floor(ms / 60000) % 60;
+    const h = Math.floor(ms / 3600000);
+    const p = n => String(n).padStart(2, '0');
+    return { main: (h ? h + ':' : '') + p(m) + ':' + p(s), ms: '.' + p(cs) };
+  }
+
+  // ---- 모래시계 ----
+  const glass = document.getElementById('hourglass');
+  const sandTop = document.getElementById('sandTop');
+  const sandBottom = document.getElementById('sandBottom');
+  const stream = document.getElementById('stream');
+  const cycleSel = document.getElementById('cycle');
+  let lastCycle = 0;
+  let flipping = false;
+
+  function renderGlass() {
+    const period = Number(cycleSel.value);
+    const t = total();
+    const cycle = Math.floor(t / period);
+    let frac = (t % period) / period;
+
+    // 한 주기가 끝나면 모래시계를 뒤집는다
+    if (cycle > lastCycle && !flipping) {
+      flipping = true;
+      glass.classList.add('flipping');
+    }
+    lastCycle = cycle;
+    if (flipping) frac = 1; // 뒤집는 동안은 '다 떨어진' 상태로 보여 줌
+
+    const topH = 70 * (1 - frac);         // 위쪽 모래 (y 30~100)
+    sandTop.setAttribute('y', 100 - topH);
+    sandTop.setAttribute('height', topH);
+    const botH = 66 * frac;               // 아래쪽 모래 (y 120~186)
+    sandBottom.setAttribute('y', 186 - botH);
+    sandBottom.setAttribute('height', botH);
+    stream.setAttribute('y2', 186 - botH);
+    stream.setAttribute('visibility', running && !flipping && frac < 1 ? 'visible' : 'hidden');
+  }
+
+  glass.addEventListener('transitionend', () => {
+    // 회전이 끝나면 회전을 즉시 0으로 되돌리고, 위쪽이 가득 찬 상태로 이어 간다
+    glass.style.transition = 'none';
+    glass.classList.remove('flipping');
+    void glass.getBoundingClientRect();
+    glass.style.transition = '';
+    flipping = false;
+    renderGlass();
+  });
+
+  cycleSel.addEventListener('change', () => {
+    lastCycle = Math.floor(total() / Number(cycleSel.value));
+    renderGlass();
+  });
+
+  function render() {
+    renderGlass();
+    const t = fmt(total());
+    display.innerHTML = `${t.main}<span class="ms">${t.ms}</span>`;
+    const cur = lapList.querySelector('li.current span:last-child');
+    if (cur) { const l = fmt(total() - lapStart); cur.textContent = l.main + l.ms; }
+    if (running) rafId = requestAnimationFrame(render);
+  }
+
+  function renderLaps() {
+    lapList.innerHTML = '';
+    if (!running && elapsed === 0) return;
+    const min = laps.length > 1 ? Math.min(...laps) : null;
+    const max = laps.length > 1 ? Math.max(...laps) : null;
+    const add = (label, ms, cls) => {
+      const li = document.createElement('li');
+      if (cls) li.className = cls;
+      const t = fmt(ms);
+      li.innerHTML = `<span>${label}</span><span>${t.main}${t.ms}</span>`;
+      lapList.appendChild(li);
+    };
+    add(`랩 ${laps.length + 1}`, total() - lapStart, 'current');
+    for (let i = laps.length - 1; i >= 0; i--) {
+      const cls = laps[i] === min ? 'best' : laps[i] === max ? 'worst' : '';
+      add(`랩 ${i + 1}`, laps[i], cls);
+    }
+  }
+
+  function updateButtons() {
+    document.body.classList.toggle('running', running);
+    primary.textContent = running ? '정지' : '시작';
+    primary.className = running ? 'stop' : 'start';
+    secondary.textContent = running || elapsed === 0 ? '랩' : '재설정';
+    secondary.disabled = !running && elapsed === 0;
+  }
+
+  function toggle() {
+    if (running) {
+      elapsed = total();
+      running = false;
+      cancelAnimationFrame(rafId);
+      render();
+    } else {
+      startTime = performance.now();
+      running = true;
+      renderLaps();
+      render();
+    }
+    updateButtons();
+  }
+
+  function lap() {
+    if (!running) return;
+    const now = total();
+    laps.push(now - lapStart);
+    lapStart = now;
+    renderLaps();
+  }
+
+  function reset() {
+    if (running) return;
+    elapsed = 0; laps = []; lapStart = 0; lastCycle = 0;
+    render(); renderLaps(); updateButtons();
+  }
+
+  primary.addEventListener('click', toggle);
+  secondary.addEventListener('click', () => running ? lap() : reset());
+
+  document.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.key === 'l' || e.key === 'L') lap();
+    else if (e.key === 'r' || e.key === 'R') reset();
+  });
+</script>
+</body>
+</html>
